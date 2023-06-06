@@ -12,4 +12,5 @@ for A in $(ls | awk '{print $NF}')
 do 
 	echo $A 
        	cp $directory/$A/local_backups/backup.tgz $directory/$A/public_html/$dest_name
+	echo "Backup file copied to public_html"
 done

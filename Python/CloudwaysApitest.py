@@ -106,6 +106,14 @@ class callCloudwaysAPI:
         responseObj = self.res
         return responseObj
 
+    # # Get Applications CNAME and Aliases
+    # def cnamenAliases(self):
+    #     print("\n\n*** Getting Getting CNAME and Aliases ***\n")
+    #     self.url = urljoin(BASE_URL, "server")
+    #     self.req = requests.get(self.url, headers=self.headers)
+    #     self.res = json.loads(self.req.text)
+    #     print(self.res)
+
     # Update WebP Redirection for apps
     def updateWebP(self, server_id, app_id, status):
         print(
@@ -195,6 +203,87 @@ class callCloudwaysAPI:
                 app_id = dataObj["servers"][i]["apps"][j]["id"]
                 # call the function that you want to run like func_name(server_id=server_id, app_id=app_id)
 
+    def installSSLAllApps(self):
+        dataObj = self.appnServerId()
+        noOfServers = len(dataObj["servers"])
+
+        for i in range(0, noOfServers):
+            noOfApps = len(dataObj["servers"][i]["apps"])
+            server_id = dataObj["servers"][i]["id"]
+
+            for j in range(0, noOfApps):
+                appdomains = []
+                wwwcname = ""
+                nonwwwcname = ""
+
+                app_id = dataObj["servers"][i]["apps"][j]["id"]
+                cname = dataObj["servers"][i]["apps"][j]["cname"]
+                aliases = dataObj["servers"][i]["apps"][j]["aliases"]
+                if cname == "":
+                    print(
+                        f"\n ****** There is no custom domain added on the application having Application ID: {app_id} ****** \n"
+                    )
+                    break
+
+                else:
+                    print(
+                        f"\n \n \nThese are the CNAMEs: {cname} and these are the Aliases: {aliases} \n \n \n "
+                    )
+
+                    if cname.count(".") == 1:
+                        wwwcname = "www." + cname
+                        appdomains.extend([cname, wwwcname])
+                        appdomains += aliases
+
+                    elif cname.count("www") == 1 and cname.count(".") == 2:
+                        nonwwwcname = cname[4:]
+                        appdomains.extend([cname, nonwwwcname])
+                        appdomains += aliases
+
+                    else:
+                        appdomains.extend([cname])
+                        appdomains += aliases
+
+                    self.installSSL(
+                        server_id=server_id, app_id=app_id, domains_list=appdomains
+                    )
+
+                print(appdomains)
+
+    def installSSL(self, server_id, app_id, domains_list: list[str]) -> None:
+        print(
+            f"\n\n*** Installing SSL on server {server_id} and application {app_id} ***\n"
+        )
+        print(type(domains_list))
+        operation_id = 0
+        self.payload = {
+            "server_id": server_id,
+            "app_id": app_id,
+            "ssl_email": EMAIL,
+            "wild_card": False,
+            "ssl_domains[]": domains_list,
+        }
+
+        self.url = urljoin(BASE_URL, "security/lets_encrypt_install")
+        self.req = requests.post(self.url, headers=self.headers, data=self.payload)
+        self.res = json.loads(self.req.text)
+        print(self.res)
+        if self.res:
+            # self.operation_id = self.res['server']['operations'][0]['id']
+            self.operation_id = self.res["operation_id"]
+            flag = True
+            # Check if Operation is Compelted
+            while flag:
+                check = self.isOpCompleted(op_id=self.operation_id)
+                if int(check) != 0:
+                    flag = False
+                    time.sleep(5)
+                    print(
+                        f"\n****** Operation Completed for installing SSL on Application ID: {app_id} on Server ID: {server_id}  ****** \n"
+                    )
+        else:
+            pass
+
 
 def main():
     CA = callCloudwaysAPI()
@@ -206,7 +295,8 @@ def main():
     # CA.launchServer()
     # CA.appnServerId()
     # CA.performOperationAllApps()
-    CA.performOperationWpApps()
+    # CA.performOperationWpApps()
+    CA.installSSLAllApps()
 
 
 if __name__ == "__main__":
